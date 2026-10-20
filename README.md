@@ -14,4 +14,12 @@ Both paths hand the app its database through the same environment variable,
 
 ```
 app.py, migrate.py, requirements.txt   the Flask app (shared)
+rockcraft.yaml                         rock (OCI image), flask-framework extension
+```
+
+## Kubernetes path: rockcraft → charmcraft → juju
+
+```bash
+# 1. Build the rock
+rockcraft pack
 ```
