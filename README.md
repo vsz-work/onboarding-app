@@ -86,3 +86,36 @@ How the machine charm wires things up (`machine-charm/src/charm.py`):
 4. `relation-broken`: `snap unset` the db-uri (which stops the daemon) and goes blocked.
 
 Unit tests: `cd machine-charm && tox -e unit`
+
+## Things to try
+
+Each application lives in one model, so every command below names its model with `-m`.
+Without `-m`, `juju` uses the current model (`juju switch` changes it, and `juju add-model`
+switches to the new model, which is why the deploy steps above don't need it).
+
+```bash
+K8S=ck8s:onboarding-k8s
+LXD=lxd:onboarding-machine
+
+# Kubernetes path
+juju scale-application -m $K8S onboarding-app 2              # one more pod; units share one counter
+juju remove-relation   -m $K8S onboarding-app postgresql-k8s # app goes blocked...
+juju integrate         -m $K8S onboarding-app postgresql-k8s # ...and recovers
+juju config            -m $K8S onboarding-app                # options added by the flask-framework extension
+juju debug-log         -m $K8S --include onboarding-app
+
+# Machine path
+juju add-unit          -m $LXD onboarding-app-machine        # one more LXD machine; same shared counter
+juju remove-relation   -m $LXD onboarding-app-machine postgresql
+juju integrate         -m $LXD onboarding-app-machine postgresql
+juju debug-log         -m $LXD --include onboarding-app-machine
+```
+
+Upgrading: bump `version` in `rockcraft.yaml` / `snap/snapcraft.yaml`, rebuild, then:
+
+```bash
+juju refresh -m ck8s:onboarding-k8s onboarding-app --path ./charm/onboarding-app_amd64.charm \
+    --resource flask-app-image=localhost:32000/onboarding-app:0.2
+juju attach-resource -m lxd:onboarding-machine onboarding-app-machine \
+    app-snap=./onboarding-app_0.2_amd64.snap
+```
