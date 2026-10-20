@@ -96,6 +96,69 @@ How the machine charm wires things up (`machine-charm/src/charm.py`):
 
 Unit tests: `cd machine-charm && tox -e unit`
 
+## Finding and reaching the apps
+
+The apps listen on port 8000. The addresses below are reachable **from the host only**:
+other devices on your network can't route to the K8s pod/service network or the LXD bridge.
+
+### Juju's view (same command on both substrates)
+
+```bash
+juju status -m ck8s:onboarding-k8s          # K8s: units and pod IPs ("Address" column)
+juju status -m lxd:onboarding-machine       # LXD: units, machine IPs ("Public address") and open ports
+
+juju switch ck8s:onboarding-k8s             # after switching, -m can be dropped
+juju status --relations                     # also show integrations
+juju status --watch 5s                      # live refresh
+juju status onboarding-app                  # just one application
+juju models -c lxd                          # models on a controller
+juju controllers                            # all controllers
+```
+
+### The substrate's view (what Juju created underneath)
+
+```bash
+# Kubernetes: one pod per unit, a service in front of the app, the database's disk
+sudo k8s kubectl -n onboarding-k8s get pods -o wide
+sudo k8s kubectl -n onboarding-k8s get svc
+sudo k8s kubectl -n onboarding-k8s get pvc
+
+# LXD: one container per Juju machine (juju-<id>-N), plus the controller's container
+lxc list
+```
+
+### Calling the apps
+
+On K8s, prefer the **service** address: pod IPs change whenever a pod is recreated, but the
+`onboarding-app` service keeps its IP while the application is deployed, and it balances across all units.
+
+```bash
+# K8s, through the service
+K8S_IP=$(sudo k8s kubectl -n onboarding-k8s get svc onboarding-app -o jsonpath='{.spec.clusterIP}')
+curl http://$K8S_IP:8000/
+
+# LXD, one machine unit
+LXD_IP=$(juju status -m lxd:onboarding-machine onboarding-app-machine --format=json \
+    | python3 -c 'import json,sys; u=json.load(sys.stdin)["applications"]["onboarding-app-machine"]["units"]; print(next(iter(u.values()))["public-address"])')
+curl http://$LXD_IP:8000/
+curl http://$LXD_IP:8000/health
+```
+
+The two counters differ because each path has its own database.
+
+### Getting a shell on a unit
+
+```bash
+juju ssh -m lxd:onboarding-machine onboarding-app-machine/0                    # the LXD machine
+juju ssh -m ck8s:onboarding-k8s --container flask-app onboarding-app/0 bash    # the rock's container
+```
+
+### Reaching the apps from other devices
+
+Not set up. The usual options:
+- **K8s:** deploy `nginx-ingress-integrator` and integrate it with `onboarding-app` to get a hostname.
+- **LXD:** add an LXD proxy device that forwards a host port to the machine.
+
 ## Things to try
 
 Each application lives in one model, so every command below names its model with `-m`.
