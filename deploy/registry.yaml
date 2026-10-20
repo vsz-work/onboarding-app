@@ -1,0 +1,38 @@
+# Minimal local image registry for pushing rocks into Canonical K8s.
+# Reachable from the host and the kubelet as localhost:32000.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: registry}
+  template:
+    metadata:
+      labels: {app: registry}
+    spec:
+      containers:
+        - name: registry
+          image: registry:2
+          ports:
+            - containerPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: registry
+spec:
+  type: NodePort
+  selector: {app: registry}
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 32000
