@@ -281,6 +281,22 @@ juju attach-resource -m lxd:onboarding-machine onboarding-app-machine \
     app-snap=./vsz-onboarding-app_0.2_amd64.snap
 ```
 
+Renaming the snap (as when `onboarding-app` became `vsz-onboarding-app`) is not a normal
+upgrade. The charm installs the new snap alongside the old one, and both would listen on port
+8000. Remove the old snap first, then refresh the charm and attach the new snap in one step:
+
+```bash
+cd machine-charm && charmcraft pack && cd ..
+juju exec -m lxd:onboarding-machine --application onboarding-app-machine -- \
+    snap remove --purge onboarding-app
+juju refresh -m lxd:onboarding-machine onboarding-app-machine \
+    --path ./machine-charm/onboarding-app-machine_amd64.charm \
+    --resource app-snap=./vsz-onboarding-app_0.1_amd64.snap
+```
+
+`upgrade-charm` installs the new snap and gives it the existing integration's credentials, so
+the data is untouched. The app is down between the removal and the refresh.
+
 ## Troubleshooting
 
 ### Every K8s request that touches the database takes ~6 seconds
