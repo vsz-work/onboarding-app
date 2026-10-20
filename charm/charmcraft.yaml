@@ -17,11 +17,12 @@ platforms:
   # s390x:
 
 # (Required)
-summary: A very short one-line summary of the Flask application.
+summary: Tiny Flask + PostgreSQL visit counter (Kubernetes charm).
 
 # (Required)
 description: |
-  A comprehensive overview of your Flask application.
+  Deploys the onboarding-app Flask rock on Kubernetes and connects it
+  to PostgreSQL through the postgresql_client interface.
 
 extensions:
   - flask-framework
@@ -29,13 +30,14 @@ extensions:
 # Uncomment the integrations used by your application
 # Integrations set to "optional: false" will block the charm
 # until the applications are integrated.
-# requires:
+requires:
+  postgresql:
+    interface: postgresql_client
+    optional: false
+    limit: 1
+# Other integrations supported by the extension:
 #   mysql:
 #     interface: mysql_client
-#     optional: false
-#     limit: 1
-#   postgresql:
-#     interface: postgresql_client
 #     optional: false
 #     limit: 1
 #   mongodb:
