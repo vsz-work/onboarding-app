@@ -1,0 +1,5 @@
+*.rock
+*.snap
+*.charm
+.venv/
+__pycache__/
