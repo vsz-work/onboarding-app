@@ -96,6 +96,70 @@ How the machine charm wires things up (`machine-charm/src/charm.py`):
 
 Unit tests: `cd machine-charm && tox -e unit`
 
+## Publishing the snap to the Snap Store
+
+The machine path doesn't need the store: the snap is attached to the charm as a resource.
+Publishing makes it installable anywhere with `snap install vsz-onboarding-app`.
+
+### One-time account setup
+
+1. Create an account at https://snapcraft.io (the same one as Ubuntu One / Launchpad).
+2. Sign the developer agreement at https://dashboard.snapcraft.io/dev/agreements/new/.
+   Without it, registering fails with `user-not-ready: Developer has not signed agreement`.
+3. Log in from a real terminal. `snapcraft login` prompts for a password and refuses to run
+   without a TTY (for example through an agent or a CI job):
+   ```bash
+   snapcraft login
+   snapcraft whoami
+   ```
+4. Register the name. Snap names are global and first come, first served, which is why this
+   snap is `vsz-onboarding-app` and not `onboarding-app`:
+   ```bash
+   snapcraft register vsz-onboarding-app
+   snapcraft names                      # your registered snaps
+   ```
+
+### Upload and release
+
+```bash
+snapcraft pack
+snapcraft upload --release=edge vsz-onboarding-app_0.1_amd64.snap
+snapcraft status vsz-onboarding-app      # which revision is on which channel
+```
+
+The store runs an automated review and assigns a **revision** (1, 2, …). Channels are
+`track/risk`, here `latest/edge`, `beta`, `candidate` and `stable`. Promote the same revision
+as you gain confidence in it:
+
+```bash
+snapcraft release vsz-onboarding-app <revision> beta,candidate
+snapcraft release vsz-onboarding-app <revision> stable    # what a plain `snap install` gets
+```
+
+`grade: stable` in `snapcraft.yaml` allows `candidate` and `stable`; `grade: devel` snaps are
+limited to `edge` and `beta`. The store page's title, license and links come from
+`snapcraft.yaml`. Add an icon and screenshots at https://snapcraft.io/vsz-onboarding-app/listing.
+
+### Test the published snap
+
+Use a clean container, so the local `--dangerous` copy can't mask problems:
+
+```bash
+lxc launch ubuntu:24.04 snap-test
+lxc exec snap-test -- snap install vsz-onboarding-app --edge
+lxc exec snap-test -- snap info vsz-onboarding-app       # publisher is your store account
+lxc exec snap-test -- snap services vsz-onboarding-app   # server stays disabled until db-uri is set
+lxc delete --force snap-test
+```
+
+For CI, export credentials limited to this snap and pass them through
+`SNAPCRAFT_STORE_CREDENTIALS` instead of logging in:
+
+```bash
+snapcraft export-login --snaps vsz-onboarding-app \
+    --acls package_access,package_push,package_update,package_release creds.txt
+```
+
 ## Finding and reaching the apps
 
 The apps listen on port 8000. The addresses below are reachable **from the host only**:
