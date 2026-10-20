@@ -2,7 +2,7 @@
 # Copyright 2026 Vítor Zeni
 # See LICENSE file for licensing details.
 
-"""Charm the onboarding-app snap on a machine."""
+"""Charm the vsz-onboarding-app snap on a machine."""
 
 import logging
 import urllib.parse

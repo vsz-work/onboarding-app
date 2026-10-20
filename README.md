@@ -69,7 +69,7 @@ The 12-factor charm runs `migrate.py` automatically once the database relation i
 ## Machine path: snapcraft → charmcraft → juju
 
 ```bash
-# 1. Build the snap (optionally try it locally: sudo snap install --dangerous ./onboarding-app_0.1_amd64.snap)
+# 1. Build the snap (optionally try it locally: sudo snap install --dangerous ./vsz-onboarding-app_0.1_amd64.snap)
 snapcraft pack
 
 # 2. Build the machine charm
@@ -79,7 +79,7 @@ cd machine-charm && charmcraft fetch-libs && charmcraft pack && cd ..
 juju add-model onboarding-machine -c lxd
 juju deploy postgresql --channel 16/stable
 juju deploy ./machine-charm/onboarding-app-machine_amd64.charm \
-    --resource app-snap=./onboarding-app_0.1_amd64.snap
+    --resource app-snap=./vsz-onboarding-app_0.1_amd64.snap
 juju integrate onboarding-app-machine postgresql
 juju status --watch 5s
 
@@ -89,9 +89,9 @@ curl http://<onboarding-app-machine unit address>:8000/
 How the machine charm wires things up (`machine-charm/src/charm.py`):
 
 1. `install`/`upgrade-charm`: fetch the `app-snap` resource and `snap install --dangerous` it.
-2. When the database relation provides credentials, it runs `snap set onboarding-app db-uri=...`.
+2. When the database relation provides credentials, it runs `snap set vsz-onboarding-app db-uri=...`.
    The snap's `configure` hook enables and restarts the `server` daemon.
-3. It then runs `onboarding-app.migrate`, opens port 8000 and goes active.
+3. It then runs `vsz-onboarding-app.migrate`, opens port 8000 and goes active.
 4. `relation-broken`: `snap unset` the db-uri (which stops the daemon) and goes blocked.
 
 Unit tests: `cd machine-charm && tox -e unit`
@@ -278,7 +278,7 @@ Upgrading: bump `version` in `rockcraft.yaml` / `snap/snapcraft.yaml`, rebuild, 
 juju refresh -m ck8s:onboarding-k8s onboarding-app --path ./charm/onboarding-app_amd64.charm \
     --resource flask-app-image=localhost:32000/onboarding-app:0.2
 juju attach-resource -m lxd:onboarding-machine onboarding-app-machine \
-    app-snap=./onboarding-app_0.2_amd64.snap
+    app-snap=./vsz-onboarding-app_0.2_amd64.snap
 ```
 
 ## Troubleshooting

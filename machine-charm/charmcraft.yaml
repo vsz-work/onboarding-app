@@ -5,7 +5,7 @@ name: onboarding-app-machine
 title: Onboarding App (machine)
 summary: Tiny Flask + PostgreSQL visit counter, deployed from a snap.
 description: |
-  Installs the onboarding-app snap (attached as a charm resource), connects it
+  Installs the vsz-onboarding-app snap (attached as a charm resource), connects it
   to PostgreSQL over the postgresql_client interface, runs the schema
   migration and exposes the app on port 8000.
 
@@ -37,5 +37,5 @@ requires:
 resources:
   app-snap:
     type: file
-    filename: onboarding-app.snap
-    description: The onboarding-app snap built with snapcraft.
+    filename: vsz-onboarding-app.snap
+    description: The vsz-onboarding-app snap built with snapcraft.

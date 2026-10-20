@@ -3,7 +3,7 @@
 
 """Functions for managing and interacting with the workload.
 
-The workload is the onboarding-app snap. This module only shells out to snapd,
+The workload is the vsz-onboarding-app snap. This module only shells out to snapd,
 so it could be used outside the context of a charm.
 """
 
@@ -13,7 +13,7 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-SNAP_NAME = "onboarding-app"
+SNAP_NAME = "vsz-onboarding-app"
 PORT = 8000
 
 

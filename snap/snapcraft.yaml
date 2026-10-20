@@ -1,4 +1,5 @@
-name: onboarding-app
+name: vsz-onboarding-app
+title: Onboarding App
 base: core24
 version: "0.1"
 summary: Tiny Flask + PostgreSQL visit counter for learning Juju deployments
@@ -6,9 +7,14 @@ description: |
   Minimal Flask app that records visits in PostgreSQL, served by gunicorn
   on port 8000. Point it at a database with:
 
-    sudo snap set onboarding-app db-uri=postgresql://user:pass@host:5432/db
+    sudo snap set vsz-onboarding-app db-uri=postgresql://user:pass@host:5432/db
 
-  then create the schema with `sudo onboarding-app.migrate`.
+  then create the schema with `sudo vsz-onboarding-app.migrate`.
+license: Apache-2.0
+contact: https://github.com/vsz-work/onboarding-app/issues
+issues: https://github.com/vsz-work/onboarding-app/issues
+source-code: https://github.com/vsz-work/onboarding-app
+website: https://github.com/vsz-work/onboarding-app
 grade: stable
 confinement: strict
 
