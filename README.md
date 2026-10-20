@@ -30,6 +30,15 @@ sudo k8s kubectl apply -f deploy/registry.yaml
 # Juju controllers: one on K8s, one on LXD
 juju bootstrap ck8s ck8s              # skip if it already exists
 juju bootstrap localhost lxd
+
+# Desktop hosts with NetworkManager: keep LXD's "lxd" DNS search domain out of
+# the host resolver (see Troubleshooting below)
+sudo tee /etc/NetworkManager/conf.d/99-unmanaged-veth.conf <<'EOF'
+[keyfile]
+unmanaged-devices=driver:veth
+EOF
+sudo systemctl reload NetworkManager
+sudo systemctl restart systemd-resolved
 ```
 
 ## Kubernetes path: rockcraft → charmcraft → juju
@@ -119,3 +128,43 @@ juju refresh -m ck8s:onboarding-k8s onboarding-app --path ./charm/onboarding-app
 juju attach-resource -m lxd:onboarding-machine onboarding-app-machine \
     app-snap=./onboarding-app_0.2_amd64.snap
 ```
+
+## Troubleshooting
+
+### Every K8s request that touches the database takes ~6 seconds
+
+`/health` is instant, but `/` takes about 6 s, and `/etc/resolv.conf` on the host shows `search lxd`.
+
+**Cause:** when LXD starts a container (craft builds, Juju machines), the container's
+veth briefly appears on the host. NetworkManager auto-creates a "Wired connection N"
+profile for it and runs DHCP against LXD's dnsmasq, which hands out the search domain `lxd`.
+That domain leaks into the host resolver and from there into every pod's `resolv.conf`.
+With `ndots:5`, resolving `postgresql-k8s-primary.onboarding-k8s.svc.cluster.local` also
+tries `….lxd`. CoreDNS forwards that to the upstream router, which drops it, so every new
+DB connection waits for the timeout.
+
+Diagnose:
+
+```bash
+grep search /etc/resolv.conf                         # "search lxd" = affected
+sudo k8s kubectl -n onboarding-k8s exec onboarding-app-0 -c charm -- \
+    grep search /etc/resolv.conf                     # pod inherited "lxd"
+journalctl -u systemd-resolved | grep "search domain list to: lxd"
+```
+
+Fix: apply the NetworkManager config from *One-time setup* (it makes NM ignore veth
+devices, which LXD, Juju and Cilium manage themselves). Then recreate the pods, because a
+pod's `resolv.conf` is fixed when the pod is created:
+
+```bash
+sudo k8s kubectl -n onboarding-k8s delete pod -l app.kubernetes.io/name=onboarding-app
+```
+
+To undo: `sudo rm /etc/NetworkManager/conf.d/99-unmanaged-veth.conf && sudo systemctl reload NetworkManager`.
+
+### The K8s charm takes 10+ minutes to pack
+
+The `flask-framework` extension uses charmcraft's `charm` plugin, which compiles every Python
+dependency from source (`pip install --no-binary=:all:`), including Rust-based ones such as
+pydantic-core. Rebuilds reuse the build container and are faster. The machine charm uses
+the `uv` plugin and prebuilt wheels, so it packs in about 2 minutes.
