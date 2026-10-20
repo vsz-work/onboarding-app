@@ -15,6 +15,7 @@ Both paths hand the app its database through the same environment variable,
 ```
 app.py, migrate.py, requirements.txt   the Flask app (shared)
 rockcraft.yaml                         rock (OCI image), flask-framework extension
+charm/                                 K8s charm, flask-framework extension (paas-charm)
 deploy/registry.yaml                   local image registry for K8s (localhost:32000)
 ```
 
@@ -36,4 +37,19 @@ rockcraft pack
 rockcraft.skopeo --insecure-policy copy --dest-tls-verify=false \
     oci-archive:onboarding-app_0.1_amd64.rock \
     docker://localhost:32000/onboarding-app:0.1
+
+# 2. Build the charm (the extension declares its own charm libs)
+cd charm && charmcraft fetch-libs && charmcraft pack && cd ..
+
+# 3. Deploy
+juju add-model onboarding-k8s -c ck8s
+juju deploy postgresql-k8s --channel 16/stable --trust
+juju deploy ./charm/onboarding-app_amd64.charm \
+    --resource flask-app-image=localhost:32000/onboarding-app:0.1
+juju integrate onboarding-app postgresql-k8s
+juju status --watch 5s                # wait for active/idle
+
+curl http://<onboarding-app unit address>:8000/
 ```
+
+The 12-factor charm runs `migrate.py` automatically once the database relation is ready.
