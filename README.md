@@ -159,6 +159,95 @@ Not set up. The usual options:
 - **K8s:** deploy `nginx-ingress-integrator` and integrate it with `onboarding-app` to get a hostname.
 - **LXD:** add an LXD proxy device that forwards a host port to the machine.
 
+## Accessing the database directly
+
+Nobody types database passwords here: on `juju integrate`, the PostgreSQL charm creates a
+user and stores its credentials in a **Juju secret** that it shares with the app. As model
+admin you can read those secrets too.
+
+### Which secret is which
+
+```bash
+juju secrets -m ck8s:onboarding-k8s               # IDs, owners, labels
+juju show-secret -m ck8s:onboarding-k8s <id>      # metadata, including who has access
+juju show-secret -m ck8s:onboarding-k8s <id> --reveal   # the content (live passwords!)
+```
+
+| Label | Contents | Shared with |
+|---|---|---|
+| `database.<N>.user.secret` | the app's DB credentials: `username`, `password`, `uris`, `read-only-uris` | the app |
+| `database.<N>.tls.secret` | TLS settings for that integration | the app |
+| `database-peers.<charm>.app` | the DB charm's internal passwords (`operator-password`, `replication-password`, …) | nobody |
+| `database-peers.<charm>.unit` | per-unit internal data | nobody |
+
+`<N>` is the integration ID. Removing and re-adding an integration creates a new ID and new
+credentials; the old `database.<N>.*` secrets may stay behind unused.
+
+### Connecting with psql as the app's user
+
+`uris` is a complete connection string. This helper finds the current integration's secret
+and prints it:
+
+```bash
+# usage: db_uri <model> <app-unit> <endpoint>
+db_uri() {
+    local rel_id label secret_id
+    rel_id=$(juju exec -m "$1" --unit "$2" -- relation-ids "$3" | cut -d: -f2)
+    label="database.${rel_id}.user.secret"
+    secret_id=$(juju secrets -m "$1" --format=json | LABEL="$label" python3 -c \
+        'import json,os,sys; print(next(k for k,v in json.load(sys.stdin).items() if v.get("label")==os.environ["LABEL"]))')
+    juju show-secret -m "$1" "$secret_id" --reveal --format=json | python3 -c \
+        'import json,sys; print(next(iter(json.load(sys.stdin).values()))["content"]["Data"]["uris"])'
+}
+```
+
+The endpoint is the name in each charm's `requires:` section: `postgresql` for the K8s charm,
+`database` for the machine charm. The easiest place to run `psql` is the database unit itself,
+where the client is already installed:
+
+```bash
+# Kubernetes: psql inside the DB pod's postgresql container
+URI=$(db_uri ck8s:onboarding-k8s onboarding-app/0 postgresql)
+juju ssh -m ck8s:onboarding-k8s --container postgresql postgresql-k8s/0 "psql '$URI'"
+
+# LXD: PostgreSQL is installed as the charmed-postgresql snap
+URI=$(db_uri lxd:onboarding-machine onboarding-app-machine/0 database)
+juju ssh -m lxd:onboarding-machine postgresql/0 "charmed-postgresql.psql '$URI'"
+```
+
+Try `select count(*) from visits;`: it matches the counter the app returns. The databases are
+named differently. paas-charm names the K8s one after the app (`onboarding-app`); our machine
+charm requests `onboarding`.
+
+Capturing the URI in a variable keeps the password off the screen, but it is still a live
+credential: avoid echoing it or pasting it anywhere.
+
+### Your own user: data-integrator
+
+Logging in with the app's credentials means you act **as the app**. For your own separate,
+revocable user, use the `data-integrator` charm, which requests credentials on your behalf.
+(Not deployed here.)
+
+```bash
+juju deploy -m lxd:onboarding-machine data-integrator --config database-name=onboarding
+juju integrate -m lxd:onboarding-machine data-integrator postgresql
+juju run -m lxd:onboarding-machine data-integrator/leader get-credentials
+# remove the integration to revoke that user
+```
+
+On K8s, use `-m ck8s:onboarding-k8s`, `postgresql-k8s`, and add `--trust` to the deploy.
+
+### From the host instead of the DB unit
+
+- **LXD:** the DB is at the `postgresql/0` public address, port 5432. Install a client with
+  `sudo apt install postgresql-client`. Not tested here: the charm's access rules may reject
+  hosts that aren't integrated with it.
+- **K8s:** the DB is only reachable inside the cluster. Forward a port, then connect to
+  `localhost:5432` with the username and password from the secret:
+  ```bash
+  sudo k8s kubectl -n onboarding-k8s port-forward svc/postgresql-k8s-primary 5432:5432
+  ```
+
 ## Things to try
 
 Each application lives in one model, so every command below names its model with `-m`.
