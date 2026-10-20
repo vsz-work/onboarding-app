@@ -48,7 +48,11 @@ minversion = "6.0"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # data_platform_libs.data_interfaces still calls the deprecated API.
+    "ignore:JujuVersion.from_environ:DeprecationWarning",
+]
 
 # Linting tools configuration
 [tool.ruff]

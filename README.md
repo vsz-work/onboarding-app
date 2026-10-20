@@ -17,6 +17,7 @@ app.py, migrate.py, requirements.txt   the Flask app (shared)
 rockcraft.yaml                         rock (OCI image), flask-framework extension
 charm/                                 K8s charm, flask-framework extension (paas-charm)
 snap/                                  snap: gunicorn daemon + migrate command + configure hook
+machine-charm/                         machine charm: installs the snap, relates to postgresql
 deploy/registry.yaml                   local image registry for K8s (localhost:32000)
 ```
 
@@ -26,8 +27,9 @@ deploy/registry.yaml                   local image registry for K8s (localhost:3
 lxd init --auto                       # craft tools build inside LXD
 sudo k8s enable local-storage         # postgresql-k8s needs PVCs
 sudo k8s kubectl apply -f deploy/registry.yaml
-# Juju controller on Kubernetes
+# Juju controllers: one on K8s, one on LXD
 juju bootstrap ck8s ck8s              # skip if it already exists
+juju bootstrap localhost lxd
 ```
 
 ## Kubernetes path: rockcraft → charmcraft → juju
@@ -60,4 +62,27 @@ The 12-factor charm runs `migrate.py` automatically once the database relation i
 ```bash
 # 1. Build the snap (optionally try it locally: sudo snap install --dangerous ./onboarding-app_0.1_amd64.snap)
 snapcraft pack
+
+# 2. Build the machine charm
+cd machine-charm && charmcraft fetch-libs && charmcraft pack && cd ..
+
+# 3. Deploy, attaching the snap as a charm resource (no store upload needed)
+juju add-model onboarding-machine -c lxd
+juju deploy postgresql --channel 16/stable
+juju deploy ./machine-charm/onboarding-app-machine_amd64.charm \
+    --resource app-snap=./onboarding-app_0.1_amd64.snap
+juju integrate onboarding-app-machine postgresql
+juju status --watch 5s
+
+curl http://<onboarding-app-machine unit address>:8000/
 ```
+
+How the machine charm wires things up (`machine-charm/src/charm.py`):
+
+1. `install`/`upgrade-charm`: fetch the `app-snap` resource and `snap install --dangerous` it.
+2. When the database relation provides credentials, it runs `snap set onboarding-app db-uri=...`.
+   The snap's `configure` hook enables and restarts the `server` daemon.
+3. It then runs `onboarding-app.migrate`, opens port 8000 and goes active.
+4. `relation-broken`: `snap unset` the db-uri (which stops the daemon) and goes blocked.
+
+Unit tests: `cd machine-charm && tox -e unit`
