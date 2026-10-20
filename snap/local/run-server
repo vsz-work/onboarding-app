@@ -1,0 +1,4 @@
+#!/bin/sh -e
+POSTGRESQL_DB_CONNECT_STRING="$(snapctl get db-uri)"
+export POSTGRESQL_DB_CONNECT_STRING
+exec "$SNAP/bin/gunicorn" --chdir "$SNAP/app" --bind 0.0.0.0:8000 --workers 2 app:app

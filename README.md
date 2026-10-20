@@ -16,6 +16,7 @@ Both paths hand the app its database through the same environment variable,
 app.py, migrate.py, requirements.txt   the Flask app (shared)
 rockcraft.yaml                         rock (OCI image), flask-framework extension
 charm/                                 K8s charm, flask-framework extension (paas-charm)
+snap/                                  snap: gunicorn daemon + migrate command + configure hook
 deploy/registry.yaml                   local image registry for K8s (localhost:32000)
 ```
 
@@ -53,3 +54,10 @@ curl http://<onboarding-app unit address>:8000/
 ```
 
 The 12-factor charm runs `migrate.py` automatically once the database relation is ready.
+
+## Machine path: snapcraft → charmcraft → juju
+
+```bash
+# 1. Build the snap (optionally try it locally: sudo snap install --dangerous ./onboarding-app_0.1_amd64.snap)
+snapcraft pack
+```

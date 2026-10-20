@@ -3,12 +3,29 @@ base: core24
 version: "0.1"
 summary: Tiny Flask + PostgreSQL visit counter for learning Juju deployments
 description: |
-  Minimal Flask app that records visits in PostgreSQL.
+  Minimal Flask app that records visits in PostgreSQL, served by gunicorn
+  on port 8000. Point it at a database with:
+
+    sudo snap set onboarding-app db-uri=postgresql://user:pass@host:5432/db
+
+  then create the schema with `sudo onboarding-app.migrate`.
 grade: stable
 confinement: strict
 
 platforms:
   amd64:
+
+apps:
+  server:
+    command: bin/run-server
+    daemon: simple
+    # Stays disabled until the configure hook sees a db-uri.
+    install-mode: disable
+    restart-condition: on-failure
+    plugs: [network, network-bind]
+  migrate:
+    command: bin/run-migrate
+    plugs: [network]
 
 parts:
   python-deps:
@@ -26,6 +43,10 @@ parts:
     organize:
       app.py: app/app.py
       migrate.py: app/migrate.py
+      snap/local/run-server: bin/run-server
+      snap/local/run-migrate: bin/run-migrate
     stage:
       - app/app.py
       - app/migrate.py
+      - bin/run-server
+      - bin/run-migrate

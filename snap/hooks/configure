@@ -1,0 +1,8 @@
+#!/bin/sh -e
+# Start (or restart) the server whenever a db-uri is configured.
+if [ -n "$(snapctl get db-uri)" ]; then
+    snapctl start --enable "$SNAP_INSTANCE_NAME.server"
+    snapctl restart "$SNAP_INSTANCE_NAME.server"
+else
+    snapctl stop --disable "$SNAP_INSTANCE_NAME.server"
+fi

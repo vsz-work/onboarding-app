@@ -1,0 +1,8 @@
+#!/bin/sh -e
+POSTGRESQL_DB_CONNECT_STRING="$(snapctl get db-uri)"
+if [ -z "$POSTGRESQL_DB_CONNECT_STRING" ]; then
+    echo "db-uri is not set: snap set onboarding-app db-uri=postgresql://..." >&2
+    exit 1
+fi
+export POSTGRESQL_DB_CONNECT_STRING
+exec "$SNAP/bin/python3" "$SNAP/app/migrate.py"
